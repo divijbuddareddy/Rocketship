@@ -1,0 +1,45 @@
+{
+  "name": "ailabs-connect",
+  "version": "1.0.0",
+  "description": "AI Automation Labs Connect — Team collaboration and customer communication platform",
+  "private": true,
+  "scripts": {
+    "dev": "tsx server/src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "postbuild": "node -e \"const fs=require('fs'); fs.mkdirSync('dist/server/src/database', {recursive:true}); fs.copyFileSync('server/src/database/schema.sql', 'dist/server/src/database/schema.sql');\"",
+    "start": "node dist/server/src/index.js",
+    "test": "tsx tests/runner.ts",
+    "db:migrate": "tsx server/src/database/migrate.ts",
+    "db:migrate:prod": "node dist/server/src/database/migrate.js",
+    "db:seed": "tsx server/src/database/seed.ts",
+    "db:seed:prod": "node dist/server/src/database/seed.js",
+    "db:clean": "tsx server/src/database/resetClean.ts",
+    "db:clean:prod": "node dist/server/src/database/resetClean.js",
+    "bootstrap:owner": "tsx server/src/database/bootstrapOwner.ts",
+    "bootstrap:owner:prod": "node dist/server/src/database/bootstrapOwner.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Automation Labs Connect — Team Collaboration & Customer Portal</title>
+  <meta name="description" content="Self-hosted collaboration platform combining internal team messaging, customer portals, shared inboxes, task management, and provider-neutral channel integrations." />
+
+  <!-- Design System & Stylesheets -->
+  <link rel="stylesheet" href="/css/theme.css?v=3" />
+  <link rel="stylesheet" href="/css/layout.css?v=3" />
+  <link rel="stylesheet" href="/css/components.css?v=3" />
+  <link rel="stylesheet" href="/css/animations.css?v=3" />
+
+  <!-- Socket.IO Client -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- Clean Production Authentication Screen (Sign In & Sign Up) -->
+  <div class="auth-screen" id="authScreen" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">⚡</div>
+        <h1 class="auth-title">AI Labs Connect</h1>
+        <p class="auth-subtitle" id="authSubtitle">Sign in to your collaboration workspace</p>
+      </div>
+
+      <!-- Auth Mode Tabs -->
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn active" id="tabSignIn">Sign In</button>
+        <button type="button" class="auth-tab-btn" id="tabSignUp">Create Account</button>
+      </div>
+
+      <!-- 1. Sign In Form -->
+      <form class="auth-form" id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="loginEmail">Email Address</label>
+          <input type="email" id="loginEmail" class="form-input" placeholder="name@company.com" required autocomplete="username" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" class="form-input" placeholder="••••••••••••" required autocomplete="current-password" />
+        </div>
+
+        <button type="submit" class="btn-auth-submit" id="loginSubmitBtn">
+          <span>Sign In</span>
+          <span>➤</span>
+        </button>
+      </form>
+
+      <!-- 2. Sign Up Form -->
+      <form class="auth-form" id="signupForm" style="display: none;">
+        <div class="form-group">
+          <label class="form-label" for="signupName">Full Name / Display Name</label>
+          <input type="text" id="signupName" class="form-input" placeholder="e.g. Sarah Connor" required autocomplete="name" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="signupEmail">Work Email Address</label>
+          <input type="email" id="signupEmail" class="form-input" placeholder="name@company.com" required autocomplete="email" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" class="form-input" placeholder="Min. 8 characters" minlength="8" required autocomplete="new-password" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="signupPasswordConfirm">Confirm Password</label>
+          <input type="password" id="signupPasswordConfirm" class="form-input" placeholder="Repeat your password" minlength="8" required autocomplete="new-password" />
+        </div>
+
+        <!-- Alert banner for duplicate credentials or error -->
+        <div class="signup-alert-box" id="signupAlert"></div>
+
+        <button type="submit" class="btn-auth-submit" id="signupSubmitBtn">
+          <span>Create Account</span>
+          <span>➤</span>
+        </button>
+      </form>
+
+      <!-- Toggle prompt at bottom -->
+      <div class="auth-switch-prompt">
+        <span id="authSwitchPromptText">Don't have an account?</span>
+        <button type="button" id="authSwitchBtn" style="background: none; border: none; color: var(--brand-primary); cursor: pointer; font-weight: 600; margin-left: 4px; text-decoration: underline;">Create one</button>
+      </div>
+
+      <div class="auth-footer">
+        <div>Protected by server-side encrypted session tokens.</div>
+        <div style="margin-top: 4px; color: var(--text-dim);">AI Automation Labs LLP — Enterprise Collaboration Core</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Global Bar -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <div class="logo-badge" title="AI Automation Labs Connect">
+        <span class="logo-icon">⚡</span>
+        <span class="logo-text">AI Labs Connect</span>
+      </div>
+      <span class="topbar-divider"></span>
+      <div class="breadcrumb-trail">
+        <button class="breadcrumb-ws-btn" id="activeWorkspacePill" title="Switch Workspace">
+          <span id="activeWorkspacePillIcon">🏢</span>
+          <span id="activeWorkspacePillName">AI Automation Labs Team</span>
+          <span class="breadcrumb-arrow">▾</span>
+        </button>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-channel" id="topbarChannelBreadcrumb"># general</span>
+      </div>
+    </div>
+
+    <!-- Center Search Bar -->
+    <div class="top-bar-center">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="globalSearchInput" placeholder="Quick search messages, channels, tasks..." readonly />
+        <kbd class="search-kbd">⌘K</kbd>
+      </div>
+    </div>
+
+    <div class="top-bar-right">
+      <div class="connection-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Live</span>
+      </div>
+
+      <button class="btn-pill" id="btnAiCopilotTrigger" title="AI Assistant & Owner API Key Settings" style="font-size: 0.76rem; padding: 5px 12px; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+        <span>✨</span>
+        <span style="font-weight: 500;">AI Assistant</span>
+        <span id="aiKeyIndicatorDot" style="width: 7px; height: 7px; border-radius: 50%; background: #ef4444; display: inline-block;" title="API Key Required"></span>
+      </button>
+
+      <button class="btn-pill" id="btnHelpGuide" title="Platform Structure & Feature Guide" style="font-size: 0.76rem; padding: 5px 10px;">
+        <span>💡 Guide</span>
+      </button>
+
+      <div class="user-profile-badge" id="userProfileBadge">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <button class="btn-pill" id="btnSignOut" title="Sign out of session" style="font-size: 0.76rem; padding: 5px 10px;">
+        <span>🚪 Sign Out</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- App Main Layout -->
+  <div class="app-container">
+
+    <!-- Left Navigation Sidebar -->
+    <aside class="app-sidebar">
+      <div class="workspace-select-wrapper">
+        <div class="workspace-header" id="workspaceHeader" title="Click to switch workspace">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <div class="sidebar-scroll">
+        <!-- Primary Navigation Sections (Internal Team Only) -->
+        <div class="nav-section internal-only-nav">
+          <div class="nav-section-title">
+            <span>Workspaces & Hubs</span>
+          </div>
+          <div class="nav-item" id="navSharedInbox">
+            <div class="nav-item-left">
+              <span class="nav-icon">📥</span>
+              <span>Customer Inbox</span>
+            </div>
+            <span class="nav-count-badge" id="inboxCountBadge" style="display: none;">0</span>
+          </div>
+          <div class="nav-item" id="navKanban">
+            <div class="nav-item-left">
+              <span class="nav-icon">📊</span>
+              <span>Tasks & Kanban</span>
+            </div>
+          </div>
+          <div class="nav-item" id="navMeetings">
+            <div class="nav-item-left">
+              <span class="nav-icon">📹</span>
+              <span>Audio/Video Calls</span>
+            </div>
+          </div>
+          <div class="nav-item" id="navIntegrations">
+            <div class="nav-item-left">
+              <span class="nav-icon">⚡</span>
+              <span>DevOps & Tooling</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Channels & Conversations List -->
+        <div class="nav-section">
+          <div class="nav-section-title">
+            <span>Conversations</span>
+            <button class="btn-icon internal-only-nav" id="btnAddChannel" title="Create Channel" style="font-size: 0.8rem; padding: 2px 6px;">+</button>
+          </div>
+          <div id="sidebarConversations">
+            <!-- Channels populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Admin Quick Actions (Internal Team Only) -->
+        <div class="nav-section internal-only-nav" style="margin-top: auto; padding-top: 16px;">
+          <div class="nav-section-title">
+            <span>Administration</span>
+          </div>
+          <div class="nav-item" id="btnAddCustomer">
+            <div class="nav-item-left">
+              <span class="nav-icon">➕</span>
+              <span>Provision Customer</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Workspace -->
+    <main class="app-main">
+
+      <!-- View 1: Realtime Chat View -->
+      <div id="chatView" style="display: flex; flex-direction: column; height: 100%; flex: 1;">
+        <header class="conversation-header" id="conversationHeader">
+          <!-- Rendered dynamically -->
+        </header>
+
+        <div class="messages-timeline" id="messagesTimeline">
+          <!-- Messages rendered dynamically -->
+        </div>
+
+        <div class="typing-bar" id="typingBar"></div>
+
+        <div class="composer-container">
+          <div class="composer-box">
+            <textarea
+              class="composer-input"
+              id="composerInput"
+              placeholder="Type a message or press Shift + Enter for newline..."
+              rows="1"
+            ></textarea>
+
+            <div class="composer-controls">
+              <div class="composer-actions-left">
+                <!-- Internal Note Toggle Switch -->
+                <button
+                  type="button"
+                  class="toggle-internal-note"
+                  id="toggleInternalNote"
+                  title="Make this an internal note only visible to team members"
+                >
+                  <span>🔒</span>
+                  <span>Internal Note</span>
+                </button>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn-send" id="btnSendMessage">
+                  <span>Send</span>
+                  <span>➤</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- View 2: Shared Customer Inbox View -->
+      <div id="inboxView" class="view-container" style="display: none;">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">📥 Customer Shared Inbox</h1>
+            <p class="view-subtitle">Unified triage for Customer Portals, WhatsApp, Website Chat, Telegram, and Email.</p>
+          </div>
+        </div>
+
+        <div class="inbox-filter-bar">
+          <select class="filter-select" id="filterInboxStatus">
+            <option value="all">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="pending">Pending</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <select class="filter-select" id="filterInboxPriority">
+            <option value="all">All Priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+          </select>
+          <select class="filter-select" id="filterInboxChannel">
+            <option value="all">All Channels</option>
+            <option value="portal">Customer Portal</option>
+            <option value="website_chat">Website Chat</option>
+            <option value="telegram">Telegram</option>
+            <option value="whatsapp">WhatsApp</option>
+          </select>
+        </div>
+
+        <div class="inbox-list" id="inboxListContainer">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- View 3: Tasks & Kanban Board View -->
+      <div id="kanbanView" class="view-container" style="display: none;">
+        <div class="view-header" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+          <div>
+            <h1 class="view-title">📊 Tasks & Kanban Board</h1>
+            <p class="view-subtitle">Real-time team task management with status transitions and assignees.</p>
+          </div>
+          <button class="btn-pill primary" id="btnCreateTask" style="font-size: 0.84rem; padding: 8px 14px;">
+            <span>➕ New Task</span>
+          </button>
+        </div>
+
+        <div class="kanban-board" id="kanbanBoardContainer">
+          <!-- Columns rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- View 4: Software & DevOps Integrations View -->
+      <div id="integrationsView" class="view-container" style="display: none;">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">⚡ Software & DevOps Integrations</h1>
+            <p class="view-subtitle">Engineering toolchain connectors for GitHub, GitLab, Linear, Sentry, Docker, Kubernetes, and Cloud CI/CD pipelines.</p>
+          </div>
+        </div>
+
+        <div class="integrations-grid" id="integrationsContainer">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- View 5: Audio / Video Calls View (LiveKit) -->
+      <div id="meetingsView" class="view-container" style="display: none;">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">📹 Audio/Video Conference</h1>
+            <p class="view-subtitle">LiveKit-compatible WebRTC meeting room with permissions and token auth.</p>
+          </div>
+        </div>
+
+        <div id="meetingRoomContainer">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- AI Assistant Modal Dialog -->
+  <div class="modal-overlay" id="aiModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">✨ AI Collaboration Assistant</div>
+        <button class="btn-icon close-modal-btn">✕</button>
+      </div>
+      <div id="aiModalContent">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic Modal Dialog (Switch Workspace, Add Channel, Add Customer) -->
+  <div class="modal-overlay" id="genericModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="genericModalTitle">Dialog</div>
+        <button class="btn-icon close-modal-btn">✕</button>
+      </div>
+      <div id="genericModalBody">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Website Live Chat Widget Embed POC -->
+  <div class="live-chat-launcher" id="liveChatLauncher" title="Website Live Chat POC">
+    💬
+  </div>
+
+  <div class="live-chat-window" id="liveChatWindow">
+    <div class="widget-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span>⚡</span>
+        <span style="font-weight: 600;">AI Labs Live Chat</span>
+      </div>
+      <button class="btn-icon" id="closeWidgetBtn" style="color: #fff;">✕</button>
+    </div>
+    <div style="flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;" id="widgetMessages">
+      <div style="align-self: flex-start; background: rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 10px; font-size: 0.84rem; max-width: 80%;">
+        👋 Hello! Welcome to AI Automation Labs. How can we assist your team today?
+      </div>
+    </div>
+    <div style="padding: 10px; border-top: 1px solid var(--border-subtle); display: flex; gap: 6px;">
+      <input type="text" id="widgetInput" placeholder="Ask a question..." style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 10px; color: #fff; font-size: 0.82rem; outline: none;" />
+      <button id="widgetSendBtn" class="btn-pill primary">Send</button>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- App Orchestrator Module -->
+  <script type="module" src="/js/app.js?v=6"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # AI Automation Labs Connect Primary Server (REST API + Web Client + WebSocket)
+  # ============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    container_name: ailabs_api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:3000}
+      - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:3000/api/v1}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ailabs_connect}
+      - REDIS_URL=redis://redis:6379
+      - SESSION_SECRET=${SESSION_SECRET:-change_in_production_session_secret_32_chars_min}
+      - SESSION_COOKIE_NAME=ailabs_session
+      - TRUSTED_ORIGINS=${TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - BOOTSTRAP_OWNER_EMAIL=${BOOTSTRAP_OWNER_EMAIL:-owner@aiautomationlabs.com}
+      - BOOTSTRAP_OWNER_NAME=${BOOTSTRAP_OWNER_NAME:-Owner Admin}
+      - BOOTSTRAP_OWNER_SECRET=${BOOTSTRAP_OWNER_SECRET:-Admin123!SecurePassword}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ailabs_net
+
+  # ============================================================================
+  # PostgreSQL Database (Source of Truth)
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ailabs_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ailabs_connect}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/src/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ailabs_connect}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - ailabs_net
+
+  # ============================================================================
+  # Redis (Cache, Queues, Pub/Sub)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: ailabs_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ailabs_net
+
+  # ============================================================================
+  # Caddy Reverse Proxy & Automated TLS (Production/Staging)
+  # ============================================================================
+  proxy:
+    image: caddy:2-alpine
+    container_name: ailabs_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks:
+      - ailabs_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  ailabs_net:
+    driver: bridge
